@@ -32,12 +32,12 @@ def check_tokens():
     tokens = {'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
               'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
               'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID}
-    for key in tokens:
-        token_is_existed = False
-        if tokens[key]:
-            token_is_existed = True
-            return token_is_existed
-        return token_is_existed
+    token_is_existed = True
+    for key, value in tokens.items():
+        if not value:
+            token_is_existed = False
+            logger.error(f'Нет доступа к токену {key}')
+    return token_is_existed
 
 
 def send_message(bot, message):
@@ -86,13 +86,12 @@ def parse_status(homework):
     if homework is None:
         raise IndexError('Информация о домашнем задании некорректного типа')
 
-    keys = ('homework_name', 'status')
-    for key in keys:
+    for key in ('homework_name', 'status'):
         if not homework.get(key):
             raise KeyError(f'Поля {key} не существует')
 
-    homework_name = homework.get(keys[0])
-    status = homework.get(keys[1])
+    homework_name = homework.get('homework_name')
+    status = homework.get('status')
 
     if status not in HOMEWORK_VERDICTS:
         raise KeyError(f'В ответе API неожиданный статус: {status}')
@@ -117,7 +116,8 @@ def main():
             response = get_api_answer(timestamp)
             check_resp = check_response(response)
             if check_resp:
-                updated_status = parse_status(check_resp[0])
+                last_homework, *other = check_resp
+                updated_status = parse_status(last_homework)
 
                 if updated_status != status:
                     send_message(bot, updated_status)
