@@ -1,13 +1,12 @@
-from http import HTTPStatus
 import logging
 import os
 import sys
 import time
+from http import HTTPStatus
 
-from dotenv import load_dotenv
 import requests
 import telegram
-
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -25,24 +24,20 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
-logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s, %(levelname)s, %(message)s',
-    encoding='utf-8',
-    stream=sys.stdout
-)
-
 logger = logging.getLogger(__name__)
 
 
 def check_tokens():
     """Проверить доступ переменных окружения."""
-    if (PRACTICUM_TOKEN is None or PRACTICUM_TOKEN == ''
-            and TELEGRAM_TOKEN is None or TELEGRAM_TOKEN == ''
-            and TELEGRAM_CHAT_ID is None or TELEGRAM_CHAT_ID == ''):
-        return False
-
-    return True
+    tokens = {'PRACTICUM_TOKEN': PRACTICUM_TOKEN,
+              'TELEGRAM_TOKEN': TELEGRAM_TOKEN,
+              'TELEGRAM_CHAT_ID': TELEGRAM_CHAT_ID}
+    for key in tokens:
+        token_is_existed = False
+        if tokens[key]:
+            token_is_existed = True
+            return token_is_existed
+        return token_is_existed
 
 
 def send_message(bot, message):
@@ -83,26 +78,27 @@ def check_response(response):
     if not isinstance(response['homeworks'], list):
         raise TypeError('Значение ключа "homeworks" не является списком')
 
-    return response['homeworks'][0]
+    return response['homeworks']
 
 
 def parse_status(homework):
     """Извлечь статус рассматриваемой работы."""
     if homework is None:
-        raise IndexError('Этого домашнего задания не существует')
+        raise IndexError('Информация о домашнем задании некорректного типа')
 
-    homework_name = homework.get('homework_name')
-    status = homework.get('status')
+    keys = ('homework_name', 'status')
+    for key in keys:
+        if not homework.get(key):
+            raise KeyError(f'Поля {key} не существует')
 
-    if homework_name is None or homework_name == '':
-        raise KeyError('Значение ключа "homework_name" не существует')
-    if status is None or status == '':
-        raise KeyError('Значение ключа "status" не существует')
+    homework_name = homework.get(keys[0])
+    status = homework.get(keys[1])
+
     if status not in HOMEWORK_VERDICTS:
         raise KeyError(f'В ответе API неожиданный статус: {status}')
 
-    verdict = HOMEWORK_VERDICTS[status]
-    return f'Изменился статус проверки работы "{homework_name}". {verdict}'
+    return (f'Изменился статус проверки '
+            f'работы "{homework_name}". {HOMEWORK_VERDICTS[status]}')
 
 
 def main():
@@ -121,7 +117,7 @@ def main():
             response = get_api_answer(timestamp)
             check_resp = check_response(response)
             if check_resp:
-                updated_status = parse_status(check_resp)
+                updated_status = parse_status(check_resp[0])
 
                 if updated_status != status:
                     send_message(bot, updated_status)
@@ -142,4 +138,10 @@ def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.DEBUG,
+        format='%(asctime)s, %(levelname)s, %(message)s',
+        encoding='utf-8',
+        stream=sys.stdout)
+
     main()
